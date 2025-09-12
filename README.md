@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 style="font-family: Arial;">Maze Net</h1>
+  <h1 style="font-family: Arial;">Mamba-DQN</h1>
   <h3>Một AI agent được huấn luyện bằng Deep Reinforcement Learning để chinh phục tựa game cổ điển Montezuma’s Revenge.</h3>
 </div>
 
