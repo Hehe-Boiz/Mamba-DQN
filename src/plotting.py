@@ -4,10 +4,11 @@ import torch
 
 # Thiết lập matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
+try:
     from IPython import display
-
-plt.ion()
+    is_ipython = True
+except ImportError:
+    is_ipython = False
 
 def plot_durations(episode_rewards, episode_durations, show_result=False):
     """Vẽ biểu đồ thời lượng và phần thưởng của các episode."""
@@ -48,3 +49,45 @@ def plot_durations(episode_rewards, episode_durations, show_result=False):
     if show_result:
         plt.ioff()
         plt.show()
+
+
+def plot_training_progress(evaluation_points, avg_rewards, avg_q_values, show_result=False):
+    """
+    Vẽ biểu đồ tiến trình huấn luyện với 2 ô:
+    1. Phần thưởng trung bình qua các lần đánh giá.
+    2. Giá trị Q tối đa trung bình qua các lần đánh giá.
+    """
+    if is_ipython:
+        display.clear_output(wait=True)
+
+    # Sử dụng fig, (ax1, ax2) để có thể vẽ trên cùng một cửa sổ
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    fig.suptitle('Training Progress')
+
+    # Biểu đồ 1: Average Reward
+    ax1.cla()  # Xóa trục cũ để vẽ lại
+    ax1.plot(evaluation_points, avg_rewards, 'b-')
+    ax1.set_xlabel('Episode')
+    ax1.set_ylabel('Average Reward')
+    ax1.grid(True)
+
+    # Biểu đồ 2: Average Max Q-Value
+    ax2.cla()  # Xóa trục cũ để vẽ lại
+    ax2.plot(evaluation_points, avg_q_values, 'g-')
+    ax2.set_xlabel('Episode')
+    ax2.set_ylabel('Average Max Q-Value')
+    ax2.grid(True)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    if show_result:
+        plt.ioff()
+        plt.show()
+    else:
+        if is_ipython:
+            display.display(plt.gcf())
+            plt.close(fig)
+        else:
+            plt.pause(0.001)
+            if not show_result:  # Chỉ đóng khi không phải kết quả cuối
+                plt.close(fig)

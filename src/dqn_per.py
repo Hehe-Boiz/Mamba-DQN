@@ -10,13 +10,14 @@ import numpy as np
 from model import DQN
 # Thay đổi import để sử dụng PrioritizedReplayMemory
 from memory import PrioritizedReplayMemory, Transition
-from plotting import plot_durations, plot_training_progress
+from plotting import *
 
-class DQNAgent:
+
+class DQNAgent_per:
     def __init__(self, input_shape, n_actions,
                  batch_size=64, gamma=0.99, eps_start=0.9, eps_end=0.01,
                  eps_decay=10000, tau=0.005, lr=3e-4, target_update=10,
-                 learn_every=4, memory_size=20000):
+                 learn_every=4, memory_size=30000):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.n_actions = n_actions
@@ -52,27 +53,25 @@ class DQNAgent:
                 return self.policy_net(state).max(1).indices.view(1, 1)
         else:
             return torch.tensor([[env.action_space.sample()]], device=self.device, dtype=torch.long)
-            
+
     def store_transition(self, state, action, next_state, reward):
         """Tính toán TD error ban đầu và lưu transition vào bộ nhớ."""
         # Chuyển đổi sang tensor để tính toán
         if not torch.is_tensor(reward):
             reward = torch.tensor([reward], device=self.device, dtype=torch.float32)
-        
+
         with torch.no_grad():
             current_q = self.policy_net(state).gather(1, action)
 
-            # Tính Q-value mục tiêu
+            # Tính Q-value mục tiêu (DQN thuần túy)
             next_q = 0.0
             if next_state is not None:
-                    best_action = self.policy_net(next_state).argmax(1).unsqueeze(1)
-                    next_q = self.target_net(next_state).gather(1, best_action).item()
+                next_q = self.target_net(next_state).max(1).values.item()
             target_q = reward + (self.gamma * next_q)
             # TD error
             error = abs(current_q - target_q).item()
         # Lưu vào bộ nhớ
         self.memory.add(error, (state, action, next_state, reward))
-
 
     def optimize_model(self):
         """Tối ưu hóa policy network bằng PER."""
@@ -86,7 +85,7 @@ class DQNAgent:
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
-        
+
         # Xử lý các trạng thái không phải cuối cùng
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)),
                                       device=self.device, dtype=torch.bool)
@@ -95,13 +94,12 @@ class DQNAgent:
         # Tính Q(s_t, a) hiện tại
         state_action_values = self.policy_net(state_batch).gather(1, action_batch)
 
-        # Tính V(s_{t+1}) cho tất cả các next states
+        # Tính V(s_{t+1}) cho tất cả các next states (DQN thuần túy)
         next_state_values = torch.zeros(self.batch_size, device=self.device)
-        with torch.no_grad(): # sửa lại cho DDQN
-            best_actions_next = self.policy_net(non_final_next_states).argmax(1).unsqueeze(1)
-            q_values_from_target_net = self.target_net(non_final_next_states).gather(1, best_actions_next)
-            next_state_values[non_final_mask] = q_values_from_target_net.squeeze()
-        
+        with torch.no_grad():
+            # Sử dụng target network để lấy max Q-value (DQN thuần túy)
+            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1).values
+
         # Tính Q-value mục tiêu
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
@@ -110,13 +108,13 @@ class DQNAgent:
         for i in range(self.batch_size):
             idx = idxs[i]
             self.memory.update(idx, errors[i][0])
-            
+
         # Tính loss có trọng số (importance sampling)
         is_weights_t = torch.FloatTensor(is_weights).to(self.device)
-        criterion = torch.nn.SmoothL1Loss(reduction='none') # Để nhân với is_weights
+        criterion = torch.nn.SmoothL1Loss(reduction='none')  # Để nhân với is_weights
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
         weighted_loss = (is_weights_t * loss.squeeze()).mean()
-        
+
         # Tối ưu hóa
         self.optimizer.zero_grad()
         weighted_loss.backward()
@@ -129,7 +127,7 @@ class DQNAgent:
         policy_net_state_dict = self.policy_net.state_dict()
         for key in policy_net_state_dict:
             target_net_state_dict[key] = policy_net_state_dict[key] * self.tau + \
-                                       target_net_state_dict[key] * (1 - self.tau)
+                                         target_net_state_dict[key] * (1 - self.tau)
         self.target_net.load_state_dict(target_net_state_dict)
 
     def evaluate_agent(self, env, n_episodes=30, eval_epsilon=0.05):
@@ -174,20 +172,20 @@ class DQNAgent:
         self.policy_net.train()  # Chuyển model về lại chế độ huấn luyện
         return average_q
 
-    def train(self, env, num_episodes, eval_every_episodes):
+    def train(self, env, num_episodes, eval_every_episodes=20):
         """Vòng lặp huấn luyện chính."""
 
-        # tạo các trạng thái ngẫu nhiên để test
-        fixed_states = []
+        fixed_states_list = []
         state, _ = env.reset()
-        while len(fixed_states) < 1000:  # Thu thập 1000 trạng thái ngẫu nhiên
+        while len(fixed_states_list) < 1000:
             action = env.action_space.sample()
-            observation, _, terminated, truncated, _ = env.step(action)
-            fixed_states.append(torch.from_numpy(np.array(state, copy=False)).float().to(self.device).unsqueeze(0))
-            state = observation
-            if terminated or truncated:
+            obs, _, term, trunc, _ = env.step(action)
+            fixed_states_list.append(torch.from_numpy(np.array(state, copy=False)).float().to(self.device).unsqueeze(0))
+            state = obs
+            if term or trunc:
                 state, _ = env.reset()
-        fixed_states_tensor = torch.cat(fixed_states, 0)
+        fixed_states_tensor = torch.cat(fixed_states_list, 0)
+        print(f"Collected {fixed_states_tensor.shape[0]} states.")
 
         avg_rewards_list = []
         avg_q_values_list = []
@@ -205,11 +203,12 @@ class DQNAgent:
                 reward_t = torch.tensor([reward], device=self.device)
                 done = terminated or truncated
 
-                next_state = None if terminated else torch.from_numpy(np.array(observation, copy=False)).float().to(self.device).unsqueeze(0)
-                
-                # Thay đổi: Sử dụng hàm store_transition mới
+                next_state = None if terminated else torch.from_numpy(np.array(observation, copy=False)).float().to(
+                    self.device).unsqueeze(0)
+
+                # Sử dụng hàm store_transition
                 self.store_transition(state, action, next_state, reward_t)
-                
+
                 state = next_state
 
                 if self.steps_done % self.learn_every == 0:
@@ -225,7 +224,7 @@ class DQNAgent:
                         f"Episode {i_episode:3d} | Steps: {t + 1:4d} | Reward: {total_reward:8.2f} | Epsilon: {eps_threshold:.3f}")
                     break
             if i_episode % eval_every_episodes == 0:
-                avg_reward = self.evaluate_agent(env, n_episodes=30)
+                avg_reward = self.evaluate_agent(env)
                 avg_q = self.calculate_avg_q(fixed_states_tensor)
 
                 avg_rewards_list.append(avg_reward)
@@ -234,8 +233,11 @@ class DQNAgent:
 
                 eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
                     -1. * self.steps_done / self.eps_decay)
-                print(f"Episode {i_episode:5d} | Avg Reward (30 ep): {avg_reward:8.2f} | Avg Max Q: {avg_q:8.2f} | Epsilon: {eps_threshold:.3f}")
+                print(
+                    f"Episode {i_episode:4d} | Avg Reward (10 ep): {avg_reward:8.2f} | Avg Max Q: {avg_q:8.2f} | Epsilon: {eps_threshold:.3f}")
+
                 plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list)
+
         print('Huấn luyện hoàn tất')
         plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list, show_result=True)
 

@@ -7,16 +7,16 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from src.model import DQN
-from src.memory import ReplayMemory, Transition
-from src.plotting import plot_durations
+from model import DQN
+from memory import ReplayMemory, Transition
+from plotting import *
 
 
 class DQNAgent_er:
     def __init__(self, input_shape, n_actions,
-                 batch_size=32, gamma=0.99, eps_start=0.9, eps_end=0.01,
+                 batch_size=64, gamma=0.99, eps_start=0.9, eps_end=0.01,
                  eps_decay=10000, tau=0.005, lr=3e-4, target_update=10,
-                 learn_every=4, memory_size=10000):
+                 learn_every=4, memory_size=20000):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.n_actions = n_actions
@@ -105,20 +105,76 @@ class DQNAgent_er:
                                          target_net_state_dict[key] * (1 - self.tau)
         self.target_net.load_state_dict(target_net_state_dict)
 
-    def train(self, env, num_episodes):
+    def evaluate_agent(self, env, n_episodes=30, eval_epsilon=0.05):
+        """
+        Chạy agent trong n_episodes với epsilon cố định để đánh giá hiệu suất.
+        Không thực hiện training trong quá trình này.
+        """
+        self.policy_net.eval()  # Chuyển model sang chế độ đánh giá
+        total_rewards = []
+        for _ in range(n_episodes):
+            state, _ = env.reset()
+            state = torch.from_numpy(np.array(state, copy=False)).float().to(self.device).unsqueeze(0)
+            episode_reward = 0
+            done = False
+            while not done:
+                if random.random() > eval_epsilon:
+                    with torch.no_grad():
+                        action = self.policy_net(state).max(1).indices.view(1, 1)
+                else:
+                    action = torch.tensor([[env.action_space.sample()]], device=self.device, dtype=torch.long)
+
+                observation, reward, terminated, truncated, _ = env.step(action.item())
+                episode_reward += reward
+                done = terminated or truncated
+                if not done:
+                    state = torch.from_numpy(np.array(observation, copy=False)).float().to(self.device).unsqueeze(0)
+            total_rewards.append(episode_reward)
+
+        self.policy_net.train()  # Chuyển model về lại chế độ huấn luyện
+        return sum(total_rewards) / n_episodes
+
+    def calculate_avg_q(self, states):
+        """
+        Tính giá trị Q tối đa trung bình trên một tập các trạng thái cố định.
+        """
+        self.policy_net.eval()  # Chuyển model sang chế độ đánh giá
+        with torch.no_grad():
+            # Lấy giá trị Q tối đa cho mỗi trạng thái
+            max_q_values = self.policy_net(states).max(1).values
+            # Tính trung bình và trả về dưới dạng số
+            average_q = max_q_values.mean().item()
+        self.policy_net.train()  # Chuyển model về lại chế độ huấn luyện
+        return average_q
+
+    def train(self, env, num_episodes, eval_every_episodes):
         """Vòng lặp huấn luyện chính."""
-        episode_durations = []
-        episode_rewards = []
+
+        fixed_states_list = []
+        state, _ = env.reset()
+        while len(fixed_states_list) < 1000:
+            action = env.action_space.sample()
+            obs, _, term, trunc, _ = env.step(action)
+            fixed_states_list.append(torch.from_numpy(np.array(state, copy=False)).float().to(self.device).unsqueeze(0))
+            state = obs
+            if term or trunc:
+                state, _ = env.reset()
+        fixed_states_tensor = torch.cat(fixed_states_list, 0)
+        print(f"Collected {fixed_states_tensor.shape[0]} states.")
+
+        avg_rewards_list = []
+        avg_q_values_list = []
+        evaluation_points = []
 
         for i_episode in range(num_episodes):
             state, _ = env.reset()
             state = torch.from_numpy(np.array(state, copy=False)).float().to(self.device).unsqueeze(0)
-            total_reward = 0
-
+            total_reward = 0.0
             for t in count():
                 action = self.select_action(state, env)
                 observation, reward, terminated, truncated, _ = env.step(action.item())
                 total_reward += reward
+
                 reward_t = torch.tensor([reward], device=self.device)
                 done = terminated or truncated
 
@@ -137,19 +193,28 @@ class DQNAgent_er:
                     self.update_target_net()
 
                 if done:
-                    episode_durations.append(t + 1)
-                    episode_rewards.append(total_reward)
-
                     eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
                         -1. * self.steps_done / self.eps_decay)
                     print(
                         f"Episode {i_episode:3d} | Steps: {t + 1:4d} | Reward: {total_reward:8.2f} | Epsilon: {eps_threshold:.3f}")
-
-                    plot_durations(episode_rewards, episode_durations)
                     break
+            if i_episode % eval_every_episodes == 0:
+                avg_reward = self.evaluate_agent(env)
+                avg_q = self.calculate_avg_q(fixed_states_tensor)
+
+                avg_rewards_list.append(avg_reward)
+                avg_q_values_list.append(avg_q)
+                evaluation_points.append(i_episode)
+
+                eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
+                    -1. * self.steps_done / self.eps_decay)
+                print(
+                    f"Episode {i_episode:4d} | Avg Reward (10 ep): {avg_reward:8.2f} | Avg Max Q: {avg_q:8.2f} | Epsilon: {eps_threshold:.3f}")
+
+                plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list)
 
         print('Huấn luyện hoàn tất')
-        plot_durations(episode_rewards, episode_durations, show_result=True)
+        plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list, show_result=True)
 
     def save_model(self, path):
         """Lưu trọng số của policy network."""
