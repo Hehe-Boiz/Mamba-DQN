@@ -16,7 +16,7 @@ CONFIG = {
     "LEARN_EVERY": 4,
     "MEMORY_SIZE": 10000,
     "NUM_EPISODES": 100,
-    "MODEL_PATH": "dqn_solaris.pth"
+    "MODEL_PATH": "dqn_per.pth"
 }
 
 def make_env(env_id):
