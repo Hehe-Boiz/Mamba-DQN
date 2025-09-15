@@ -6,7 +6,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
-from collections import deque #
+from collections import deque
 
 def evaluate(
         model_path: str,
@@ -16,10 +16,9 @@ def evaluate(
         run_name: str,
         Model: torch.nn.Module,
         device: torch.device = torch.device("cpu"),
-        epsilon: float = 0.01,  # Giảm epsilon để agent chủ yếu dùng chính sách đã học
+        epsilon: float = 0.01,
         capture_video: bool = True
 ):
-    # Dùng lambda để truyền tham số vào make_env
     envs = gym.vector.SyncVectorEnv([
         lambda: make_env(env_id, 0, capture_video, run_name)
     ])
@@ -35,12 +34,11 @@ def evaluate(
         if random.random() < epsilon:
             actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
         else:
-            q_values = model(obs)  # obs đã là numpy array, model sẽ xử lý
+            q_values = model(obs)
             actions = torch.argmax(q_values, dim=1).cpu().numpy()
 
         next_obs, _, _, _, infos = envs.step(actions)
 
-        # Xử lý thông tin khi một màn chơi kết thúc
         if "final_info" in infos:
             for info in infos["final_info"]:
                 if info and "episode" in info:
@@ -48,7 +46,6 @@ def evaluate(
                     episodic_returns.append(info['episode']['r'])
 
         obs = next_obs
-        # Nếu không ghi video, ta có thể render trực tiếp để xem
         if not capture_video:
             envs.render()
             time.sleep(0.02)
@@ -63,16 +60,13 @@ def make_env(env_id: str, idx: int, capture_video: bool, run_name: str):
     Hàm tạo môi trường, được tùy chỉnh cho Solaris và để ghi video.
     """
     def thunk():
-        # THAY ĐỔI: render_mode='rgb_array' để ghi video
         render_mode = "rgb_array" if capture_video else "human"
         env = gym.make(env_id, render_mode=render_mode)
         env = gym.wrappers.RecordEpisodeStatistics(env)
 
-        # Gói môi trường để ghi video nếu cần
         if capture_video and idx == 0:
             env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
 
-        # THAY ĐỔI: Áp dụng các bước xử lý của Atari
         env = gym.wrappers.GrayScaleObservation(env)
         env = gym.wrappers.FrameStack(env, 4)
         return env
