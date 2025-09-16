@@ -14,7 +14,7 @@ dist/
 assets/
 log/
 model/
-results/
+results/*.png
 videos/
 downloads/
 eggs/
