@@ -2,10 +2,8 @@ import random
 import numpy as np
 from collections import namedtuple, deque
 
-# Định nghĩa một transition
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
-# --- Standard Replay Memory ---
 class ReplayMemory(object):
     """Bộ nhớ đệm tiêu chuẩn để lưu trữ và lấy mẫu các transition."""
     def __init__(self, capacity):
@@ -23,7 +21,6 @@ class ReplayMemory(object):
         """Trả về kích thước hiện tại của bộ nhớ."""
         return len(self.memory)
 
-# --- Prioritized Experience Replay ---
 
 class SumTree:
     """

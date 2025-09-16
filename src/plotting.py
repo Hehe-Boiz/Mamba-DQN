@@ -2,7 +2,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import torch
 
-# Thiết lập matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
 try:
     from IPython import display
@@ -19,21 +18,18 @@ def plot_durations(episode_rewards, episode_durations, show_result=False):
         plt.clf()
         plt.title('Training...')
 
-    # Biểu đồ thời lượng
     plt.subplot(2, 1, 1)
     durations_t = torch.tensor(episode_durations, dtype=torch.float)
     plt.xlabel('Episode')
     plt.ylabel('Duration')
     plt.plot(durations_t.numpy())
 
-    # Biểu đồ phần thưởng
     plt.subplot(2, 1, 2)
     rewards_t = torch.tensor(episode_rewards, dtype=torch.float)
     plt.xlabel('Episode')
     plt.ylabel('Reward')
     plt.plot(rewards_t.numpy())
 
-    # Vẽ đường trung bình 100 episode gần nhất
     if len(rewards_t) >= 100:
         means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
         means = torch.cat((torch.zeros(99), means))
@@ -41,7 +37,7 @@ def plot_durations(episode_rewards, episode_durations, show_result=False):
         plt.legend()
 
     plt.tight_layout()
-    plt.pause(0.001)  # pause a bit so that plots are updated
+    plt.pause(0.001)
     if is_ipython and not show_result:
         display.display(plt.gcf())
         display.clear_output(wait=True)
@@ -60,19 +56,16 @@ def plot_training_progress(evaluation_points, avg_rewards, avg_q_values, num_epi
     if is_ipython:
         display.clear_output(wait=True)
 
-    # Sử dụng fig, (ax1, ax2) để có thể vẽ trên cùng một cửa sổ
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
     fig.suptitle('Training Progress')
 
-    # Biểu đồ 1: Average Reward
-    ax1.cla()  # Xóa trục cũ để vẽ lại
+    ax1.cla()
     ax1.plot(evaluation_points, avg_rewards, 'b-')
     ax1.set_xlabel('Episode')
     ax1.set_ylabel('Average Reward')
     ax1.grid(True)
 
-    # Biểu đồ 2: Average Max Q-Value
-    ax2.cla()  # Xóa trục cũ để vẽ lại
+    ax2.cla()
     ax2.plot(evaluation_points, avg_q_values, 'g-')
     ax2.set_xlabel('Episode')
     ax2.set_ylabel('Average Max Q-Value')
@@ -91,5 +84,5 @@ def plot_training_progress(evaluation_points, avg_rewards, avg_q_values, num_epi
             plt.close(fig)
         else:
             plt.pause(0.001)
-            if not show_result:  # Chỉ đóng khi không phải kết quả cuối
+            if not show_result:
                 plt.close(fig)

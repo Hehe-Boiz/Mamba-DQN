@@ -61,12 +61,9 @@ class DQNAgent_er:
         if len(self.memory) < self.batch_size:
             return
 
-        # Lấy mẫu từ bộ nhớ
         transitions = self.memory.sample(self.batch_size)
-        # Chuyển đổi batch-array của Transitions thành Transition của batch-arrays.
         batch = Transition(*zip(*transitions))
 
-        # Xử lý các trạng thái không phải cuối cùng
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)),
                                       device=self.device, dtype=torch.bool)
         non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
@@ -75,22 +72,17 @@ class DQNAgent_er:
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
-        # Tính Q(s_t, a)
         state_action_values = self.policy_net(state_batch).gather(1, action_batch)
 
-        # Tính V(s_{t+1}) cho tất cả các next states
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1).values
 
-        # Tính Q-value mục tiêu
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
-        # THAY ĐỔI: Tính loss thông thường
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
-        # Tối ưu hóa
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
@@ -110,7 +102,7 @@ class DQNAgent_er:
         Chạy agent trong n_episodes với epsilon cố định để đánh giá hiệu suất.
         Không thực hiện training trong quá trình này.
         """
-        self.policy_net.eval()  # Chuyển model sang chế độ đánh giá
+        self.policy_net.eval()
         total_rewards = []
         for _ in range(n_episodes):
             state, _ = env.reset()
@@ -131,20 +123,18 @@ class DQNAgent_er:
                     state = torch.from_numpy(np.array(observation, copy=False)).float().to(self.device).unsqueeze(0)
             total_rewards.append(episode_reward)
 
-        self.policy_net.train()  # Chuyển model về lại chế độ huấn luyện
+        self.policy_net.train()
         return sum(total_rewards) / n_episodes
 
     def calculate_avg_q(self, states):
         """
         Tính giá trị Q tối đa trung bình trên một tập các trạng thái cố định.
         """
-        self.policy_net.eval()  # Chuyển model sang chế độ đánh giá
+        self.policy_net.eval()
         with torch.no_grad():
-            # Lấy giá trị Q tối đa cho mỗi trạng thái
             max_q_values = self.policy_net(states).max(1).values
-            # Tính trung bình và trả về dưới dạng số
             average_q = max_q_values.mean().item()
-        self.policy_net.train()  # Chuyển model về lại chế độ huấn luyện
+        self.policy_net.train()
         return average_q
 
     def train(self, env, num_episodes, eval_every_episodes):
@@ -181,7 +171,6 @@ class DQNAgent_er:
                 next_state = None if terminated else torch.from_numpy(np.array(observation, copy=False)).float().to(
                     self.device).unsqueeze(0)
 
-                # Sử dụng hàm store_transition đã được cập nhật
                 self.store_transition(state, action, next_state, reward_t)
 
                 state = next_state

@@ -13,7 +13,6 @@ class DQN(nn.Module):
             nn.ReLU()
         )
 
-        # Hàm trợ giúp để tự động tính kích thước vector sau khi đi qua các lớp tích chập
         dummy_input = torch.zeros(1, *input_shape)
         conv_output_size = self._get_conv_output_size(dummy_input)
 
@@ -30,9 +29,7 @@ class DQN(nn.Module):
 
     def forward(self, x):
         """Forward pass qua mạng."""
-        # Chuẩn hóa giá trị pixel về khoảng [0, 1]
         x = x / 255.0
         conv_out = self.convolutional_layers(x)
-        # Flatten tensor để đưa vào lớp fully connected
         flattened = conv_out.view(x.size(0), -1)
         return self.fully_connected_layers(flattened)
