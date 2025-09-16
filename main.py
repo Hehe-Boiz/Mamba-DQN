@@ -1,29 +1,31 @@
 import gymnasium as gym
 import torch
-from src.dqn_agent import DQNAgent
+import ale_py
+from src.dqn_er import DQNAgent_er
 
 # Cấu hình các tham số
 CONFIG = {
-    "ENV_ID": "ALE/Solaris-v5",
+    "ENV_ID": "ALE/Pong-v5",
     "BATCH_SIZE": 32,
     "GAMMA": 0.99,
     "EPS_START": 0.9,
     "EPS_END": 0.01,
     "EPS_DECAY": 10000,
+    "EVAL_EVERY_EPISODE": 10,
     "TAU": 0.005,
-    "LR": 3e-4,
-    "TARGET_UPDATE": 10,
+    "LR": 2.5e-4,
+    "TARGET_UPDATE": 30,
     "LEARN_EVERY": 4,
     "MEMORY_SIZE": 10000,
     "NUM_EPISODES": 100,
-    "MODEL_PATH": "dqn_per.pth"
+    "MODEL_PATH": "dqn_er.pth"
 }
 
 def make_env(env_id):
     """Hàm tạo môi trường Gymnasium và áp dụng các wrapper cần thiết."""
     env = gym.make(env_id)
-    env = gym.wrappers.GrayScaleObservation(env)
-    env = gym.wrappers.FrameStack(env, 4)
+    env = gym.wrappers.GrayscaleObservation(env)
+    env = gym.wrappers.FrameStackObservation(env, 4)
     return env
 
 if __name__ == '__main__':
@@ -32,7 +34,7 @@ if __name__ == '__main__':
     input_shape = env.observation_space.shape
     n_actions = env.action_space.n
 
-    agent = DQNAgent(
+    agent = DQNAgent_er(
         input_shape=input_shape,
         n_actions=n_actions,
         batch_size=CONFIG["BATCH_SIZE"],
@@ -47,7 +49,7 @@ if __name__ == '__main__':
         memory_size=CONFIG["MEMORY_SIZE"]
     )
 
-    agent.train(env, CONFIG["NUM_EPISODES"])
+    agent.train(env, CONFIG["NUM_EPISODES"], CONFIG["EVAL_EVERY_EPISODE"])
 
     agent.save_model(CONFIG["MODEL_PATH"])
     print(f"Model đã được lưu tại {CONFIG['MODEL_PATH']}")
