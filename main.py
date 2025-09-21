@@ -1,6 +1,7 @@
 import gymnasium as gym
 import torch
-from src.dqn_agent import DQNAgent
+import ale_py
+from src.dqn_er import DQNAgent_er
 
 # Cấu hình các tham số
 CONFIG = {
@@ -22,8 +23,8 @@ CONFIG = {
 def make_env(env_id):
     """Hàm tạo môi trường Gymnasium và áp dụng các wrapper cần thiết."""
     env = gym.make(env_id)
-    env = gym.wrappers.GrayScaleObservation(env)
-    env = gym.wrappers.FrameStack(env, 4)
+    env = gym.wrappers.GrayscaleObservation(env)
+    env = gym.wrappers.FrameStackObservation(env, 4)
     return env
 
 if __name__ == '__main__':
@@ -32,7 +33,7 @@ if __name__ == '__main__':
     input_shape = env.observation_space.shape
     n_actions = env.action_space.n
 
-    agent = DQNAgent(
+    agent = DQNAgent_er(
         input_shape=input_shape,
         n_actions=n_actions,
         batch_size=CONFIG["BATCH_SIZE"],

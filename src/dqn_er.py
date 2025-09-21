@@ -7,9 +7,9 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from model import DQN
-from memory import ReplayMemory, Transition
-from plotting import *
+from src.model import DQN
+from src.memory import ReplayMemory, Transition
+from src.plotting import *
 
 
 class DQNAgent_er:
@@ -198,12 +198,12 @@ class DQNAgent_er:
                 eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
                     -1. * self.steps_done / self.eps_decay)
                 print(
-                    f"Episode {i_episode:4d} | Avg Reward (10 ep): {avg_reward:8.2f} | Avg Max Q: {avg_q:8.2f} | Epsilon: {eps_threshold:.3f}")
+                    f"Episode {i_episode:4d} | Avg Reward (30 ep): {avg_reward:8.2f} | Avg Max Q: {avg_q:8.2f} | Epsilon: {eps_threshold:.3f}")
 
-                plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list)
+                plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list, num_episodes)
 
         print('Huấn luyện hoàn tất')
-        plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list, show_result=True)
+        plot_training_progress(evaluation_points, avg_rewards_list, avg_q_values_list, num_episodes)
 
     def save_model(self, path):
         """Lưu trọng số của policy network."""

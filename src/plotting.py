@@ -47,7 +47,7 @@ def plot_durations(episode_rewards, episode_durations, show_result=False):
         plt.show()
 
 
-def plot_training_progress(evaluation_points, avg_rewards, avg_q_values, show_result=False):
+def plot_training_progress(evaluation_points, avg_rewards, avg_q_values, num_episodes, show_result=False):
     """
     Vẽ biểu đồ tiến trình huấn luyện với 2 ô:
     1. Phần thưởng trung bình qua các lần đánh giá.
@@ -72,6 +72,8 @@ def plot_training_progress(evaluation_points, avg_rewards, avg_q_values, show_re
     ax2.grid(True)
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    plt.savefig("./results/Training" + str(num_episodes) + ".png")
 
     if show_result:
         plt.ioff()
